@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>ODD BEANS Invoice</title>
+</head>
+<body>
+<script>
+(async function(){
+  const originalUrl = "https://raw.githubusercontent.com/nayef789-jpg/Oddbeans/062c38e2fab02cf0811b58c18fcaab74c383be37/index.html";
+  try {
+    const r = await fetch(originalUrl, {cache:"no-store"});
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    let html = await r.text();
+    const addon = "<script>\n(function(){\n  const SALES_CARD_ID = \"oddSalesTotalCard\";\n\n  function oddMoney(n){\n    try {\n      if (typeof money === \"function\") return money(n);\n    } catch(e) {}\n    return Number(n || 0).toFixed(3);\n  }\n\n  function oddInvoiceGrandTotal(inv){\n    let subtotal = 0;\n    try {\n      (inv.items || []).forEach(function(it){\n        const product = (typeof PRODUCTS !== \"undefined\" && Array.isArray(PRODUCTS))\n          ? PRODUCTS.find(function(x){ return x.name === it.product; })\n          : null;\n        if (product) subtotal += Number(product.price || 0) * Number(it.qty || 1);\n      });\n    } catch(e) {}\n\n    const delivery = inv.order_type === \"Delivery\" ? 2 : 0;\n    const discount = Math.max(0, Number(inv.discount || 0));\n    return Math.max(0, subtotal + delivery - discount);\n  }\n\n  async function oddRefreshSalesTotal(){\n    const el = document.getElementById(\"salesTotal\");\n    if (!el) return;\n\n    el.textContent = \"جاري الحساب...\";\n    try {\n      if (typeof db === \"undefined\") throw new Error(\"Database not ready\");\n\n      let total = 0;\n      let from = 0;\n      const pageSize = 1000;\n\n      while (true) {\n        const result = await db\n          .from(\"invoices\")\n          .select(\"items,order_type,discount\")\n          .eq(\"status\",\"saved\")\n          .range(from, from + pageSize - 1);\n\n        if (result.error) throw result.error;\n\n        const rows = result.data || [];\n        total += rows.reduce(function(sum, inv){\n          return sum + oddInvoiceGrandTotal(inv);\n        }, 0);\n\n        if (rows.length < pageSize) break;\n        from += pageSize;\n      }\n\n      el.textContent = oddMoney(total) + \" BHD\";\n    } catch(err) {\n      console.error(\"ODD BEANS Total Sales:\", err);\n      el.textContent = \"—\";\n    }\n  }\n\n  function oddInstallSalesCard(){\n    if (document.getElementById(SALES_CARD_ID)) return;\n\n    const search = document.getElementById(\"historySearch\");\n    if (!search) return;\n\n    const card = document.createElement(\"div\");\n    card.id = SALES_CARD_ID;\n    card.className = \"noPrint\";\n    card.style.cssText =\n      \"background:#111;color:#fff;border-radius:14px;padding:14px 16px;\" +\n      \"margin:12px 0 14px;display:flex;align-items:center;\" +\n      \"justify-content:space-between;gap:12px\";\n\n    card.innerHTML =\n      '<div>' +\n        '<div style=\"font-size:12px;opacity:.78\">مجموع المبيعات<\/div>' +\n        '<div style=\"font-size:11px;opacity:.65;margin-top:2px\">Total Sales<\/div>' +\n      '<\/div>' +\n      '<strong id=\"salesTotal\" style=\"font-size:22px;white-space:nowrap\">0.000 BHD<\/strong>';\n\n    const wrapper = search.closest(\"div\") || search.parentElement;\n    if (wrapper && wrapper.parentElement) {\n      wrapper.parentElement.insertBefore(card, wrapper);\n    } else {\n      search.parentElement.insertBefore(card, search);\n    }\n\n    oddRefreshSalesTotal();\n\n    const historyList = document.getElementById(\"historyList\");\n    if (historyList) {\n      let timer = null;\n      new MutationObserver(function(){\n        clearTimeout(timer);\n        timer = setTimeout(oddRefreshSalesTotal, 250);\n      }).observe(historyList, {childList:true, subtree:false});\n    }\n\n    const historyView = document.getElementById(\"historyView\");\n    if (historyView) {\n      new MutationObserver(function(){\n        if (!historyView.classList.contains(\"hidden\")) oddRefreshSalesTotal();\n      }).observe(historyView, {attributes:true, attributeFilter:[\"class\"]});\n    }\n  }\n\n  if (document.readyState === \"loading\") {\n    document.addEventListener(\"DOMContentLoaded\", oddInstallSalesCard);\n  } else {\n    oddInstallSalesCard();\n  }\n\n  window.addEventListener(\"load\", oddInstallSalesCard);\n})();\n<\/script>";
+    if (/<\/body>/i.test(html)) {
+      html = html.replace(/<\/body>/i, addon + "</body>");
+    } else {
+      html += addon;
+    }
+    document.open();
+    document.write(html);
+    document.close();
+  } catch (e) {
+    document.body.innerHTML =
+      '<div style="font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Arial,sans-serif;padding:24px">' +
+      '<h2>ODD BEANS</h2><p>تعذر تحميل النظام الأصلي.</p><small>' +
+      String(e).replace(/[&<>"]/g, function(c){ return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]; }) +
+      '</small></div>';
+  }
+})();
+</script>
+</body>
+</html>
