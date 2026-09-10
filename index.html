@@ -193,3 +193,105 @@ function showHistory(){$("invoiceView").classList.add("hidden");$("productsView"
 async function renderHistory(){$("historyList").innerHTML='<div class="note">جاري التحميل...</div>';const q=($("historySearch").value||"").trim().toLowerCase(),{data,error}=await db.from("invoices").select("*").eq("status","saved").order("invoice_number",{ascending:false}).limit(100);if(error){$("historyList").innerHTML='<div class="note">تعذر تحميل الفواتير.</div>';return}const f=(data||[]).filter(inv=>!q||formatNo(inv.invoice_number).toLowerCase().includes(q)||(inv.customer||"").toLowerCase().includes(q)||(inv.phone||"").includes(q));$("historyList").innerHTML=f.length?f.map(inv=>`<div class="historyItem"><div><strong>${formatNo(inv.invoice_number)} — ${inv.customer||"No name"}</strong><br><small>${inv.invoice_date} • ${inv.order_type}</small></div><button class="soft" data-open="${inv.id}">فتح</button></div>`).join(''):'<div class="note">ما عندك فواتير محفوظة.</div>'}async function loadInvoice(id){const {data,error}=await db.from("invoices").select("*").eq("id",id).single();if(error){alert("تعذر فتح الفاتورة");return}currentInvoiceDbId=data.id;currentInvoiceNumber=Number(data.invoice_number);localStorage.setItem("odd_current_invoice_id",String(data.id));$("invoiceNo").value=formatNo(currentInvoiceNumber);$("invoiceDate").value=data.invoice_date;$("customer").value=data.customer||"";$("phone").value=data.phone||"";$("payment").value=data.payment||"BenefitPay";$("orderType").value=data.order_type||"Delivery";$("discount").value=data.discount||0;items=(data.items||[]).map(x=>({product:x.product,qty:Number(x.qty||1)}));if(!items.length)items=[{product:"",qty:1}];renderItems();showInvoice()}
 async function sendPdf(){try{if(!window.jspdf||!window.jspdf.jsPDF){alert("تعذر تحميل أداة PDF.");return}const inv=payload();if(!inv.items.length){alert("اختر منتج واحد على الأقل");return}const {jsPDF}=window.jspdf;let subtotal=0;const rows=inv.items.map(it=>{const p=PRODUCTS.find(x=>x.name===it.product),qty=Number(it.qty||1),price=p?Number(p.price):0,total=price*qty;subtotal+=total;return{name:it.product,qty,price,total}}),delivery=inv.order_type==="Delivery"?2:0,discount=Math.max(0,Number(inv.discount||0)),grand=Math.max(0,subtotal+delivery-discount),doc=new jsPDF({orientation:"portrait",unit:"mm",format:[80,Math.max(155,135+rows.length*8)]});let y=7;try{const props=doc.getImageProperties(PDF_LOGO),w=45,h=w*props.height/props.width;doc.addImage(PDF_LOGO,"PNG",(80-w)/2,y,w,h);y+=h+4}catch(e){doc.setFont("helvetica","bold");doc.setFontSize(15);doc.text("ODD COFFEE BEANS",40,y+6,{align:"center"});y+=12}doc.setFont("helvetica","normal");doc.setFontSize(8);doc.text("Instagram: @oddbeans_",40,y,{align:"center"});y+=6;doc.line(5,y,75,y);y+=6;[["Invoice No.",formatNo(inv.invoice_number)],["Date",inv.invoice_date],["Customer",inv.customer||"-"],["Phone",inv.phone||"-"],["Payment",inv.payment],["Order Type",inv.order_type],["Currency","BHD"]].forEach(([k,v])=>{doc.setFont("helvetica","bold");doc.text(k,5,y);doc.setFont("helvetica","normal");doc.text(String(v),75,y,{align:"right"});y+=5});doc.line(5,y,75,y);y+=5;doc.setFont("helvetica","bold");doc.text("ITEM",5,y);doc.text("QTY",46,y,{align:"right"});doc.text("PRICE",60,y,{align:"right"});doc.text("TOTAL",75,y,{align:"right"});y+=4;doc.line(5,y,75,y);y+=5;doc.setFont("helvetica","normal");rows.forEach(r=>{const lines=doc.splitTextToSize(r.name,34);doc.text(lines,5,y);doc.text(String(r.qty),46,y,{align:"right"});doc.text(r.price.toFixed(3),60,y,{align:"right"});doc.text(r.total.toFixed(3),75,y,{align:"right"});y+=Math.max(5,lines.length*4)});doc.line(5,y,75,y);y+=6;[["SUBTOTAL",subtotal],["DELIVERY",delivery],["DISCOUNT",discount]].forEach(([k,v])=>{doc.text(k,5,y);doc.text(Number(v).toFixed(3)+" BHD",75,y,{align:"right"});y+=5});doc.setFont("helvetica","bold");doc.line(5,y,75,y);y+=5;doc.setFontSize(10);doc.text("TOTAL",5,y);doc.text(grand.toFixed(3)+" BHD",75,y,{align:"right"});y+=5;doc.line(5,y,75,y);y+=8;doc.setFont("helvetica","normal");doc.setFontSize(8);doc.text("Thank you for shopping with us!",40,y,{align:"center"});y+=5;doc.setFont("helvetica","bold");doc.text("ODD BEANS",40,y,{align:"center"});y+=5;doc.setFont("helvetica","normal");doc.text("Instagram: @oddbeans_",40,y,{align:"center"});const blob=doc.output("blob"),file=new File([blob],formatNo(inv.invoice_number)+".pdf",{type:"application/pdf"});if(navigator.share&&navigator.canShare&&navigator.canShare({files:[file]}))await navigator.share({title:"ODD BEANS "+formatNo(inv.invoice_number),files:[file]});else doc.save(formatNo(inv.invoice_number)+".pdf")}catch(e){alert("تعذر إرسال PDF: "+(e.message||e))}}
 $("loginTab").onclick=()=>setAuthMode("login");$("signupTab").onclick=()=>setAuthMode("signup");$("authSubmit").onclick=submitAuth;$("addItemBtn").onclick=()=>{items.push({product:"",qty:1});renderItems()};$("orderType").onchange=recalc;$("discount").oninput=recalc;$("saveBtn").onclick=saveInvoice;$("printBtn").onclick=()=>window.print();$("pdfBtn").onclick=sendPdf;$("newBtn").onclick=startNewInvoice;$("newTopBtn").onclick=startNewInvoice;$("historyBtn").onclick=showHistory;$("productsBtn").onclick=showProducts;$("productsBackBtn").onclick=hideProducts;$("addProductBtn").onclick=addProduct;$("backBtn").onclick=showInvoice;$("historySearch").oninput=renderHistory;$("logoutBtn").onclick=async()=>{await db.auth.signOut();showAuth()};$("historyList").onclick=e=>{if(e.target.dataset.open)loadInvoice(e.target.dataset.open)};$("productsList").onclick=e=>{if(e.target.dataset.editprod)editProduct(e.target.dataset.editprod);if(e.target.dataset.toggleprod)toggleProduct(e.target.dataset.toggleprod,e.target.dataset.active==="true")};$("items").onchange=e=>{const i=Number(e.target.dataset.index),a=e.target.dataset.action;if(a==="product"){items[i].product=e.target.value;renderItems()}if(a==="qty"){items[i].qty=Number(e.target.value);renderItems()}};$("items").onclick=e=>{if(e.target.dataset.action==="remove"){items.splice(Number(e.target.dataset.index),1);if(!items.length)items=[{product:"",qty:1}];renderItems()}};(async()=>{const {data}=await db.auth.getSession();if(data.session)await showMain();else showAuth()})();</script></body></html>
+<script>
+(async function () {
+
+  function addSalesSummaryCard() {
+    if (document.getElementById("oddSalesSummaryCard")) return;
+
+    const card = document.createElement("div");
+    card.id = "oddSalesSummaryCard";
+    card.className = "card noPrint";
+
+    card.innerHTML = `
+      <div style="font-size:18px;font-weight:900;margin-bottom:12px">
+        ملخص المبيعات
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+
+        <div style="background:#f4f1ea;border-radius:14px;padding:14px;text-align:center">
+          <div style="font-size:12px;color:#666;font-weight:700;margin-bottom:5px">
+            إجمالي المبيعات
+          </div>
+          <div id="oddTotalSales" style="font-size:22px;font-weight:900">
+            0.000 BHD
+          </div>
+        </div>
+
+        <div style="background:#f4f1ea;border-radius:14px;padding:14px;text-align:center">
+          <div style="font-size:12px;color:#666;font-weight:700;margin-bottom:5px">
+            إجمالي التوصيل
+          </div>
+          <div id="oddTotalDelivery" style="font-size:22px;font-weight:900">
+            0.000 BHD
+          </div>
+        </div>
+
+      </div>
+
+      <button id="oddRefreshSales" class="soft" type="button" style="width:100%;margin-top:10px">
+        تحديث الإجمالي
+      </button>
+    `;
+
+    const mainView = document.getElementById("mainView");
+    if (mainView) mainView.prepend(card);
+
+    document.getElementById("oddRefreshSales").onclick = loadOddSalesTotals;
+  }
+
+  async function loadOddSalesTotals() {
+    const salesEl = document.getElementById("oddTotalSales");
+    const deliveryEl = document.getElementById("oddTotalDelivery");
+
+    if (!salesEl || !deliveryEl) return;
+
+    const { data, error } = await db
+      .from("invoices")
+      .select("*")
+      .eq("status", "saved");
+
+    if (error) {
+      salesEl.textContent = "خطأ";
+      deliveryEl.textContent = "خطأ";
+      return;
+    }
+
+    let totalSales = 0;
+    let totalDelivery = 0;
+
+    (data || []).forEach(inv => {
+      let subtotal = 0;
+
+      (inv.items || []).forEach(item => {
+        const product = PRODUCTS.find(p => p.name === item.product);
+
+        if (product) {
+          subtotal += Number(product.price || 0) * Number(item.qty || 1);
+        }
+      });
+
+      const discount = Math.max(0, Number(inv.discount || 0));
+      const delivery = inv.order_type === "Delivery" ? 2 : 0;
+
+      totalSales += Math.max(0, subtotal - discount);
+      totalDelivery += delivery;
+    });
+
+    salesEl.textContent = totalSales.toFixed(3) + " BHD";
+    deliveryEl.textContent = totalDelivery.toFixed(3) + " BHD";
+  }
+
+  setTimeout(async () => {
+    addSalesSummaryCard();
+
+    if (typeof loadProducts === "function") {
+      await loadProducts();
+    }
+
+    loadOddSalesTotals();
+  }, 1000);
+
+})();
+</script>
